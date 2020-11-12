@@ -7,8 +7,8 @@ export async function read(file: string) {
   return decoder.decode(raw);
 }
 
-export function l(msg: string) {
-  log.info(`${format(new Date(), 'HH:mm:ss.SSS')} ${msg}`)
+export function l(msg: string | number | string[] | number[]) {
+  log.info(msg)
 }
 
 export const p = l
