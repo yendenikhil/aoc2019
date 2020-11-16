@@ -67,7 +67,8 @@ const countAngles = (arr: Astroid[]) => (input: Astroid) => {
 const buildAngles = (arr: Astroid[], center: Astroid) => {
     return arr.filter(a => a !== center).map(a => {
         const point = {
-            angle: Math.atan2(a.x - center.x, (a.y - center.y) * -1),
+            pt: a,
+            angle: Math.atan2(-1 * (a.x - center.x), (a.y - center.y) * -1),
             mag: Math.pow(a.y - center.y, 2) + Math.pow(a.x - center.x, 2)
         }
         return point
@@ -85,5 +86,18 @@ const part1 = arr.map(a => {
 }).reduce((acc, v) => acc.count < v.count ? v : acc)
 p(part1)
 
-const part2 = buildAngles(arr, part1.loc)
-p(Math.atan2(0, 1))
+const part2 = buildAngles(arr, part1.loc).sort((a, b) => {
+    if (a.angle < b.angle) {
+        return -1
+    } else if (a.angle > b.angle) {
+        return 1
+    } else {
+        if (a.mag < b.mag) {
+            return -1
+        } else if (a.mag > b.mag) {
+            return 1
+        }
+    }
+    return 0
+})
+p(part2[199])
