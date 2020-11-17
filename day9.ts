@@ -3,11 +3,6 @@ import { delay } from "https://deno.land/std/async/mod.ts";
 const p = console.log;
 const pipe = (...fn: any[]) => (x: any) => fn.reduce((y, f) => f(y), x);
 
-/*
-let base = 0;
-const re = /.*(.)(.)(.)(..)/;
-*/
-
 const indexForMode = (arr: string[], base: number) =>
   (mode: number) =>
     (index: number): number => {
