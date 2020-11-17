@@ -229,20 +229,7 @@ const part1 = async (arr: string[]) => {
             out = [];
         }
     }
-    p(`steps: ${moves.length}`)
-    const minx = moves.reduce((acc, val) => val.x < acc ? val.x : acc, 0)
-    const miny = moves.reduce((acc, val) => val.y < acc ? val.y : acc, 0)
-    const draw: string[][] = []
-    moves.forEach(m => {
-        if (draw[m.x - minx] === undefined) draw[m.x - minx] = []
-        draw[m.x - minx][m.y - miny] = m.color === 1 ? '#' : '_'
-    })
-    let sum = 0
-    for (const row of draw) {
-        p(row.join(''))
-        sum += row.length
-    }
-    p(`sum: ${sum}`)
+    p(`unique steps: ${new Set(moves.map(e => {const pt = {x: e.x, y: e.y}; return JSON.stringify(pt)})).size}`)
 
 };
 await part1(input.split(','))
