@@ -73,35 +73,43 @@ const lcm = (a: bigint, b: bigint): bigint => {
   return a * b / gcd(a, b);
 };
 
-const checkRepeat = (moons: Moon[]) => {
+const checkRepeat = (moons: Moon[][]) => {
   const initial = moons[0];
-  let dx = 0;
-  let dy = 0;
-  let dz = 0;
-  if (initial) {
-    const { x: px, y: py, z: pz } = initial.pos;
-    const { x: vx, y: vy, z: vz } = initial.vel;
-
-    for (let i = 1; i < moons.length; i++) {
-      const m = moons[i];
-      if (dx === 0) {
-        dx = (m.pos.x === px && m.vel.x === vx) ? i : 0;
+  const xInitial = initial.map((m) => [m.pos.x, m.vel.x]).flat();
+  const yInitial = initial.map((m) => [m.pos.y, m.vel.y]).flat();
+  const zInitial = initial.map((m) => [m.pos.z, m.vel.z]).flat();
+  const xSteps = moons.map((mm) => mm.map((m) => [m.pos.x, m.vel.x]).flat());
+  const ySteps = moons.map((mm) => mm.map((m) => [m.pos.y, m.vel.y]).flat());
+  const zSteps = moons.map((mm) => mm.map((m) => [m.pos.z, m.vel.z]).flat());
+  let dx = 0n;
+  let dy = 0n;
+  let dz = 0n;
+  for (let i = 1; i < moons.length; i++) {
+    const xStep = xSteps[i];
+    const yStep = ySteps[i];
+    const zStep = zSteps[i];
+    let fx = true;
+    let fy = true;
+    let fz = true;
+    for (let j = 0; j < 6; j++) {
+      if (xStep[j] !== xInitial[j]) {
+        fx = false;
       }
-      if (dy === 0) {
-        dy = (m.pos.y === py && m.vel.y === vy) ? i : 0;
+      if (yStep[j] !== yInitial[j]) {
+        fy = false;
       }
-      if (dz === 0) {
-        dz = (m.pos.z === pz && m.vel.z === vz) ? i : 0;
+      if (zStep[j] !== zInitial[j]) {
+        fz = false;
       }
-      if (dx > 0 && dy > 0 && dz > 0) break;
     }
+    if (fx) dx = BigInt(i);
+    if (fy) dy = BigInt(i);
+    if (fz) dz = BigInt(i);
+    if (dx > 0n && dy > 0n && dz > 0n) break;
   }
-  p(`dx: ${dx}, dy: ${dy}, dz: ${dz}`);
-  const ans = lcm(BigInt(dx), lcm(BigInt(dy), BigInt(dz)));
-  p(`lcm: ${ans}`);
-  return ans;
+  p(`x: ${dx} y: ${dy} z: ${dz}`)
+  p(lcm(dx, lcm(dy, dz)));
 };
-
 const prepInput = (input: string): Moon[] => {
   return input.split("\n").map((line) => {
     const [x, y, z] = [...line.matchAll(/=(-?[0-9]+)/g)].map((e) =>
@@ -136,17 +144,13 @@ const part2 = (moons: Moon[]) => {
   }
   console.timeEnd("generate");
   console.time("investigate");
-  const ans = [];
-  for (let i = 0; i < 4; i++) {
-    ans.push(checkRepeat(arr.map((mm) => mm[i])));
-  }
-  p(ans);
-  const cycle = ans.reduce((acc, v) => lcm(acc, v), 1n);
-  p(cycle);
+  const cycleLength = checkRepeat(arr);
   console.timeEnd("investigate");
 };
 
 const moons = prepInput(input);
 
+console.time('part1')
 part1(moons);
+console.timeEnd('part1')
 part2(moons);
