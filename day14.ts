@@ -81,14 +81,27 @@ const processInput = (raw: string) => {
     const leftList = left.split(", ");
     const leftE = leftList.map((e) => {
       const [amt, ee] = e.split(" ");
-      return { name: ee, amount: amt };
+      return { name: ee, amount: Number(amt) };
     });
-    const rightE = { amount: right.split(" ")[0], name: right.split(" ")[1] };
+    const rightE = { amount: Number(right.split(" ")[0]), name: right.split(" ")[1] };
     eq.push({ left: leftE, right: rightE });
   }
   return eq
 };
 
 const eq = processInput(input);
-const part1 = 
+const findElement = (extra: Element[]) => (element: Element) => {
+  
+  eq.filter(e => e.right.name === element.name).map(e => {
+    const mult = Math.ceil(element.amount / e.right.amount)
+  })
+}
+const part1 = () => {
+  const queue: Element[] = [{name: 'FUEL', amount: 1}]
+  while(queue.length > 0) {
+    const curr = queue.shift()
+  }
 
+}
+
+part1()
