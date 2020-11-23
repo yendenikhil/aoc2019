@@ -63,6 +63,12 @@ const input = `2 WZMS, 3 NPNFD => 5 SLRGD
 1 LTVKM => 8 RFZF
 4 DNWGS => 3 FTNZQ
 6 VZJHN => 9 PTDL`;
+const input1 = `10 ORE => 10 A
+1 ORE => 1 B
+7 A, 1 B => 1 C
+7 A, 1 C => 1 D
+7 A, 1 D => 1 E
+7 A, 1 E => 1 FUEL`;
 const p = console.log;
 
 interface Element {
@@ -83,25 +89,142 @@ const processInput = (raw: string) => {
       const [amt, ee] = e.split(" ");
       return { name: ee, amount: Number(amt) };
     });
-    const rightE = { amount: Number(right.split(" ")[0]), name: right.split(" ")[1] };
+    const rightE = {
+      amount: Number(right.split(" ")[0]),
+      name: right.split(" ")[1],
+    };
     eq.push({ left: leftE, right: rightE });
   }
-  return eq
+  return eq;
 };
 
 const eq = processInput(input);
-const findElement = (extra: Element[]) => (element: Element) => {
-  
-  eq.filter(e => e.right.name === element.name).map(e => {
-    const mult = Math.ceil(element.amount / e.right.amount)
-  })
-}
-const part1 = () => {
-  const queue: Element[] = [{name: 'FUEL', amount: 1}]
-  while(queue.length > 0) {
-    const curr = queue.shift()
+
+const checkInExtra = (
+  extra: Element[],
+  curr: Element,
+): [Element, Element[]] => {
+  const newCurr = {
+    name: curr.name,
+    amount: curr.amount,
+  };
+  const newExtra = extra.map((e) => {
+    if (e.name === curr.name) {
+      const amt = e.amount - curr.amount;
+      if (amt >= 0) {
+        e.amount = amt;
+        newCurr.amount = 0;
+      } else {
+        e.amount = 0;
+        newCurr.amount = Math.abs(amt);
+      }
+    }
+    return e;
+  }).filter((e) => e.amount !== 0);
+  return [newCurr, newExtra];
+};
+
+const updateExtra = (extra: Element[], name: string, amount: number) => {
+  const matches = extra.filter((e) => e.name === name);
+  if (matches.length > 0) {
+    const match = matches[0];
+    const update = {
+      name,
+      amount: match.amount + amount,
+    };
+    const newExtra = extra.filter((e) => e.name !== name);
+    newExtra.push(update);
+    return newExtra;
   }
+  const newExtra = extra.slice();
+  newExtra.push({ name, amount });
+  return newExtra;
+};
 
-}
+const eqMult = (mult: number, e: Eq) => {
+  const newE = {
+    right: {
+      name: e.right.name,
+      amount: e.right.amount * mult,
+    },
+    left: e.left.map((e) => {
+      return {
+        name: e.name,
+        amount: e.amount * mult,
+      };
+    }),
+  };
+  return newE;
+};
 
-part1()
+let ore = 0n;
+
+const findEq = (extra: Element[], curr: Element): [Element[], Element[]] => {
+  const matches = eq.filter((e) => e.right.name === curr.name);
+  const match = matches[0];
+  const mult = Math.ceil(curr.amount / match.right.amount);
+  const multedEq = eqMult(mult, match);
+  const rem = multedEq.right.amount - curr.amount;
+  const newExtra = updateExtra(extra, curr.name, rem);
+  const newEle = multedEq.left.filter((e) => e.name !== "ORE");
+  ore = multedEq.left.filter((e) => e.name === "ORE").map((e) => e.amount)
+    .reduce(
+      (a, b) => a + BigInt(b),
+      ore,
+    );
+  return [newEle, newExtra];
+};
+
+const bisect = (limit: BigInt) =>
+  (res: BigInt, curr: number, min: number, max: number): [number, number] => {
+    if (res === limit) {
+      return [curr, curr];
+    } else if (res < limit) {
+      return [curr, max];
+    } else {
+      return [min, curr];
+    }
+  };
+
+const median = (min: number, max: number): number => {
+  return Math.floor((min + max) / 2);
+};
+
+const part1 = (q: number): bigint => {
+  const queue: Element[] = [{ name: "FUEL", amount: q }];
+  ore = 0n;
+  let extra: Element[] = [];
+  while (queue.length > 0) {
+    let curr = queue.shift();
+    if (curr) {
+      [curr, extra] = checkInExtra(extra, curr);
+      const found = findEq(extra, curr);
+      queue.push(...found[0]);
+      extra = found[1];
+    }
+  }
+  return ore;
+};
+
+const part2 = (maxOre: BigInt) => {
+  let min = 1;
+  let max = 10000000;
+  let size = 0;
+  let newSize = max - min;
+  const f = bisect(maxOre);
+  while (size != newSize) {
+    size = newSize;
+    const curr = median(min, max);
+    const res: BigInt = part1(curr);
+    [min, max] = f(res, curr, min, max);
+    // p({min, max, curr, res})
+    newSize = max - min;
+  }
+  return median(min, max)
+};
+console.time('part1')
+p(`part1: ${part1(1)}`)
+console.timeEnd('part1')
+console.time('part2')
+p(`part2: ${part2(1000000000000n)}`)
+console.timeEnd('part2')
