@@ -175,54 +175,48 @@ sure that we will get the shortest path.
 The challenge here is that the intcode computer maintains the state, hence, 
 before we try things we need to come back (reverse steps).
 
-Also, do we need to maintain the coordinates? 
-I think not, we can just maintain the series of inputs we should be able 
-to find the oxygen tank.
+start with [0, 0]
+generate possibilities [0, 1, [1]][0, -1, [2]][1, 0, [3]][-1. 0. [4]]
 
-How
-so at position zero we have prev steps empty []
-we get all possible steps [1], [2], [3], [4]
+test with [0, 1, [1]]
+output === 0, means block 
+update visited [0, 1]
+reverse []
 
-the lets take first input [1] 
-output === 0 then it hit the wall and we can discard this input. 
-
-the lets take second input [2] 
-output === 1 then it stepped ahead we need to get all possible steps [2,1][2,2][2,3][2,4]
-now push these at the end of the queue to be tested. 
-
-and then as we took step forward we need to step back all the way to begining so
-get the reverse path
-output === 2 then stop and print the step length
-
-do we care about visited? I don't think so. 
-
-
-THe program is running too long. I am going to make visited paths and filter them out. 
-
+test with [0, -1, [2]]
+output === 1 means moved here 
+update visited [0, -1]
+generate possibilities [0, 2, [1, 1]] .... 
+filter visited
+reverse [1]
  */
 
+interface Point {
+  x: number;
+  y: number;
+  i: number[];
+}
 const visited: number[][] = [];
-
-const notInVisited = (path: number[]) => {
-  const s = path.join("");
-  return !visited.map((e) => e.join("")).find((e) => e === s);
+const notVisited = (p: Point) => {
+  return !visited.find((e) => e[0] === p.x && e[1] === p.y);
 };
-
-const allDir = (input: number[]) => {
+const nextMoves = (pt: Point) => {
+  visited.push([pt.x, pt.y]);
   return [
-    [...input, 1],
-    [...input, 4],
-    [...input, 2],
-    [...input, 3],
-  ];
+    [0, 1, 1],
+    [0, -1, 2],
+    [1, 0, 3],
+    [-1, 0, 4],
+  ].map((e) => {
+    return {
+      x: pt.x + e[0],
+      y: pt.y + e[1],
+      i: [...pt.i, e[2]],
+    };
+  }).filter(notVisited);
 };
 
-const reverse = (input: number[]) => {
-  const rev = [0, 2, 1, 4, 3];
-  return input.map((e) => rev[e]);
-};
-
-const part1 = async (arr: string[]) => {
+const part = async (arr: string[], start: Point) => {
   let stepper: Step = {
     arr: arr.slice(),
     base: 0,
@@ -230,47 +224,40 @@ const part1 = async (arr: string[]) => {
     index: 0,
     input: undefined,
   };
-
-  const queue: number[][] = [...allDir([])];
-  let path = queue.shift();
-  let orig = path?.slice();
-  stepper.input = path?.shift();
-
-  while (!stepper.halt) {
+  visited.push([start.x, start.y]);
+  const queue = [...nextMoves(start)];
+  let curr = queue.shift();
+  if (!curr) return;
+  let steps = curr.i.slice();
+  stepper.input = steps.shift();
+  while (!stepper.halt && curr) {
     stepper = await step(stepper);
     if (stepper.output !== undefined) {
       const output = Number(stepper.output);
-      // we need ignore the output till we reach to the last point
-      if (path?.length === 0 && orig) {
-      p({output, l: orig.length})
-        // if (queue.length % 1000 === 0) p({q: queue.length, s: orig.length})
-        //await delay(1000)
-        if (output === 0) {
-          // means the robot has not moved, so reverse should be all steps sans last step
-          path = reverse(orig.slice(0, -1));
-        }
+      if (steps.length === 0) {
+        p({ s: curr.i.length, q: queue.length });
+        // walked all the path
         if (output === 1) {
-          // get new all dir
-          queue.push(...allDir(orig).filter(notInVisited));
-          // reverse back to origin
-
-          path = reverse(orig);
+          queue.push(...nextMoves(curr));
         } else if (output === 2) {
-          p(`####################`);
-          p({ orig });
-          p(orig?.length);
           break;
         }
-        // pop new path
-        // we can make one long list with reverse + new path
-        orig = queue.shift();
-        if (orig) visited.push(orig.slice());
-        // p({path, orig})
-        if (orig) path.push(...orig);
+        curr = queue.shift();
+        if (curr) steps = curr.i.slice();
+        stepper.arr = arr.slice();
       }
-      stepper.input = path?.shift();
+      stepper.input = steps.shift();
     }
   }
+  return [curr?.x, curr?.y, curr?.i.length];
 };
 
-await part1(input.split(","));
+console.time("part1");
+const oxy = await part(input.split(","), { x: 0, y: 0, i: [] });
+p(oxy);
+console.timeEnd("part1");
+console.time("part2");
+if (oxy && oxy.length > 1) {
+  await part(input.split(","), { x: oxy[0] ?? 0, y: oxy[1] ?? 0, i: [] });
+}
+console.timeEnd("part2");
