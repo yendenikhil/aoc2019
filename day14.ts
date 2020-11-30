@@ -220,11 +220,11 @@ const part2 = (maxOre: BigInt) => {
     // p({min, max, curr, res})
     newSize = max - min;
   }
-  return median(min, max)
+  return median(min, max);
 };
-console.time('part1')
-p(`part1: ${part1(1)}`)
-console.timeEnd('part1')
-console.time('part2')
-p(`part2: ${part2(1000000000000n)}`)
-console.timeEnd('part2')
+console.time("part1");
+p(`part1: ${part1(1)}`);
+console.timeEnd("part1");
+console.time("part2");
+p(`part2: ${part2(1000000000000n)}`);
+console.timeEnd("part2");

@@ -227,29 +227,65 @@ const part = async (arr: string[], start: Point) => {
   visited.push([start.x, start.y]);
   const queue = [...nextMoves(start)];
   let curr = queue.shift();
+  let oxy;
   if (!curr) return;
   let steps = curr.i.slice();
   stepper.input = steps.shift();
-  while (!stepper.halt && curr) {
+  while (!stepper.halt) {
     stepper = await step(stepper);
     if (stepper.output !== undefined) {
       const output = Number(stepper.output);
       if (steps.length === 0) {
-        p({ s: curr.i.length, q: queue.length });
+        // p({ output, s: curr.i.length, q: queue.length });
         // walked all the path
         if (output === 1) {
           queue.push(...nextMoves(curr));
         } else if (output === 2) {
-          break;
+          if (curr === undefined) break;
+          oxy = [curr.x, curr.y, curr.i.length];
         }
         curr = queue.shift();
-        if (curr) steps = curr.i.slice();
+        if (curr === undefined) break;
+        steps = curr.i.slice();
         stepper.arr = arr.slice();
       }
       stepper.input = steps.shift();
     }
   }
-  return [curr?.x, curr?.y, curr?.i.length];
+  return oxy;
+};
+
+const part2 = (start: number[]) => {
+  const all = visited.slice();
+  const calcNext = (pt: number[]) => {
+    return [
+      [pt[0] + 1, pt[1], pt[2] + 1],
+      [pt[0] - 1, pt[1], pt[2] + 1],
+      [pt[0], pt[1] + 1, pt[2] + 1],
+      [pt[0], pt[1] - 1, pt[2] + 1],
+    ];
+  };
+  const removeMatching = (pt: number[]) => {
+    const idx = all.findIndex((e) => e[0] === pt[0] && e[1] === pt[1]);
+    if (idx >= 0) {
+      all.splice(idx, 1);
+    }
+    return idx > -1;
+  };
+  const queue = [[...start, 0]];
+  let ans = 0;
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    if (curr === undefined) {
+      p(`curr undef`);
+      break;
+    }
+    const next = calcNext(curr);
+    const matched = next.filter(removeMatching);
+    queue.push(...matched);
+    ans = curr[2];
+  }
+  return ans;
 };
 
 console.time("part1");
@@ -257,7 +293,7 @@ const oxy = await part(input.split(","), { x: 0, y: 0, i: [] });
 p(oxy);
 console.timeEnd("part1");
 console.time("part2");
-if (oxy && oxy.length > 1) {
-  await part(input.split(","), { x: oxy[0] ?? 0, y: oxy[1] ?? 0, i: [] });
+if (oxy) {
+  p(part2(oxy.slice(0, 2)));
 }
 console.timeEnd("part2");

@@ -107,7 +107,7 @@ const checkRepeat = (moons: Moon[][]) => {
     if (fz) dz = BigInt(i);
     if (dx > 0n && dy > 0n && dz > 0n) break;
   }
-  p(`x: ${dx} y: ${dy} z: ${dz}`)
+  p(`x: ${dx} y: ${dy} z: ${dz}`);
   p(lcm(dx, lcm(dy, dz)));
 };
 const prepInput = (input: string): Moon[] => {
@@ -150,7 +150,7 @@ const part2 = (moons: Moon[]) => {
 
 const moons = prepInput(input);
 
-console.time('part1')
+console.time("part1");
 part1(moons);
-console.timeEnd('part1')
+console.timeEnd("part1");
 part2(moons);
