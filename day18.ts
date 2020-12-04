@@ -6,6 +6,7 @@ interface Point {
   loc: number[];
   visited: number[][];
   keys: string[];
+  len: number;
 }
 const matchCoords = (a: number[], b: number[]) =>
   a[0] === b[0] && a[1] === b[1];
@@ -49,43 +50,67 @@ const part1 = async (raw: string) => {
     };
 
   // BFS
-  const queue: Point[] = [{
+  const mega: Point[] = [{
     loc: start.slice(),
     visited: [],
-    keys: [],
+    keys: ['@'],
+    len: 0,
   }];
+  const visitedNodes: [string, string, number][] = [];
+  while (mega.length > 0) {
+    const root = mega.shift();
+    if (!root) break;
+    const paths: Point[] = [];
+    const queue: Point[] = [root];
 
-  while (queue.length > 0) {
-    const curr = queue.shift();
-    if (curr === undefined) break;
-    if (curr.keys.length === 26) {
-      return curr.visited.length;
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      if (curr === undefined) break;
+      if (curr.keys.length === 26) {
+        return curr.visited.length;
+      }
+      const visited = curr.visited.slice();
+      const keys = curr.keys.slice();
+      visited.push(curr.loc);
+      const str = graph[curr.loc[0]][curr.loc[1]];
+      if (str.search(/[a-z]/) > -1 && !curr.keys.some((k) => k === str)) {
+        if (
+          !paths.some((p) => matchCoords(p.loc, curr.loc)) &&
+          !visitedNodes.some((n) => n[0] === curr.keys[0] && n[1] === str)
+        ) {
+          // p({ str, l: curr.visited.length, keys });
+          visitedNodes.push([curr.keys[0], str, visited.length]);
+          paths.push({
+            loc: curr.loc.slice(),
+            keys: [str],
+            visited: [],
+            len: visited.length,
+          });
+        }
+        continue;
+      }
+      const fv = filterVisited(curr.visited);
+      const fk = filterMissingKey(curr.keys);
+      const next: Point[] = poss(curr)
+        .filter(filterBoundries)
+        .filter(fv)
+        .filter(
+          fk,
+        ).map((p) => {
+          return {
+            visited,
+            keys,
+            loc: p,
+            len: 0,
+          };
+        });
+      queue.push(...next);
     }
-    const visited = curr.visited.slice();
-    const keys = curr.keys.slice();
-    visited.push(curr.loc);
-    const str = graph[curr.loc[0]][curr.loc[1]];
-    if (str.search(/[a-z]/) > -1) {
-      keys.push(str);
-    //   p({ str, curr });
-      p({ str, l: curr.visited.length});
-    }
-    const fv = filterVisited(curr.visited);
-    const fk = filterMissingKey(curr.keys);
-    const next: Point[] = poss(curr)
-      .filter(filterBoundries)
-      .filter(fv)
-      .filter(
-        fk,
-      ).map((p) => {
-        return {
-          visited,
-          keys,
-          loc: p,
-        };
-      });
-    queue.push(...next);
+    // p({ paths });
+    mega.push(...paths);
   }
+  p({ visitedNodes });
+  p(visitedNodes.length);
   return -1;
 };
 
