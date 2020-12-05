@@ -1,5 +1,47 @@
-const raw = await Deno.readTextFile("18.in");
+const raw = await Deno.readTextFile("18.1.in");
 const p = console.log;
+
+interface ANode {
+  keys: string[];
+  visited: string[];
+  name: string;
+  weight: number;
+  hWeight: number;
+  totalWeight: number;
+}
+
+class PriorityQueue {
+  private items: ANode[];
+  constructor() {
+    this.items = [];
+  }
+  isEmpty(): boolean {
+    return this.items.length <= 0;
+  }
+  // we need to do two things, once add comes, reshuffle to manage prio
+  // prio by the total weight
+  // if the element is present then compare the weights and if new node has less weight then replace with new node
+  push(node: ANode): void {
+    // if the node exists, should we remove it?
+    const existing = this.items.find((n) => n.name === node.name);
+    if (existing) {
+      if (existing.keys.length < node.keys.length) {
+        this.items.splice(this.items.indexOf(existing), 1, node);
+      } else if (existing.totalWeight > node.totalWeight) {
+        this.items.splice(this.items.indexOf(existing), 1, node);
+      }
+    } else {
+      this.items.push(node);
+    }
+    // rearrange
+    // p(`items: ${JSON.stringify(this.items)}`)
+    this.items.sort((a, b) => a.totalWeight - b.totalWeight);
+    // this.items.filter(e => e.keys.length === 17).forEach(e => p(e))
+  }
+  front(): ANode | undefined {
+    return this.items.shift();
+  }
+}
 
 interface Point {
   loc: number[];
@@ -45,7 +87,9 @@ const part1 = async (raw: string) => {
   const filterVisited = (visited: number[][]) =>
     (p: number[]) => !visited.some((v) => matchCoords(v, p));
   // prepare queue with each key loaction
-  const queue: Point[] = "@abcdefghijklmnopqurstuvwxyz".split("")
+  // const queue: Point[] = "@abcdefghijklmnopqurstuvwxyz".split("")
+  const nodes = "@abcdefghijklmnop".split("");
+  const queue: Point[] = nodes
     .map((k) => findKeyLoc(k))
     .map((loc) => {
       return {
@@ -73,7 +117,7 @@ const part1 = async (raw: string) => {
         edges.push([curr.key, g(curr.loc), curr.visited.length, curr.doors]);
       }
       // we need not go further as key is found
-      continue;
+      // continue;
     }
 
     // is curr a door, add and proceed
@@ -99,8 +143,65 @@ const part1 = async (raw: string) => {
       });
     queue.push(...next);
   }
-  p(edges);
-  return -1;
+  p(edges.sort());
+  // now we have all edges so time to work on A* algorithm to find shortest path
+  // NOT WORKINGfor heuristic measure we can use missing keys * some_number
+  // Take2: need something more concrete for hWeight
+  //  What if we remove matching keys from matching doors and for remaining doors * some_big_number
+  //  and remaining_keys * some_small_number * 1 and the value always non-negative
+  const missingKeyWeights = (keys: string[], doors: string[]): number => {
+    return doors.map((d) => d.toLowerCase())
+      .filter((d) => !keys.includes(d)).length * 26000 + (17 - keys.length)
+  };
+  const pq: PriorityQueue = new PriorityQueue();
+  pq.push({
+    name: "@",
+    weight: 0,
+    keys: ["@"],
+    visited: [],
+    hWeight: 0,
+    totalWeight: 0,
+  });
+  while (!pq.isEmpty()) {
+    const curr = pq.front();
+    if (!curr) break;
+    // if curr keys have all the keys (nodes.length - 1) then we found the answer, time to exit
+    // p();
+    p(">>", JSON.stringify(curr));
+    if (curr.keys.length === nodes.length) {
+      return curr;
+    }
+
+    // add to visitedNodes
+    const visitedNodes = curr.visited.slice();
+    visitedNodes.push(curr.name);
+
+    // find in edges all edges with start name of curr.name and
+    // filter out visitedNode with end name
+    // now edge.length is weight
+    // heuristic weight
+    // now to create new ANodes (we will remove duplicate from queue by queue impl so do not worry here)
+    // name is toKey, keys are curr.keys + name, weight = curr.weight + edge.len, heuristic distance is calculated by missingKeyWeight
+    // add these all to PriorityQueue
+    edges.filter((e) =>
+      e[0] === curr.name && !visitedNodes.some((v) => v === e[1])
+      // e[0] === curr.name // lets allow visited to visit again for Take2
+    )
+      .map((e) => {
+        const keys = curr.keys.slice();
+        if (!keys.includes(e[1])) keys.push(e[1]);
+        const ee = {
+          name: e[1],
+          keys,
+          visited: visitedNodes,
+          weight: curr.weight + e[2],
+          hWeight: missingKeyWeights(curr.keys, e[3]),
+          totalWeight: missingKeyWeights(curr.keys, e[3]) + curr.weight + e[2],
+        } as ANode;
+        // p(JSON.stringify(ee));
+        return ee;
+      }).forEach((an) => pq.push(an));
+  }
 };
 
 p(await part1(raw));
