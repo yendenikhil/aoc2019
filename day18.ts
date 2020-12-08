@@ -1,47 +1,7 @@
-const raw = await Deno.readTextFile("18.1.in");
+import { delay } from "https://deno.land/std/async/mod.ts";
+const raw = await Deno.readTextFile(Deno.args[0] ?? "18.in");
+const nodes = "@abcdefghijklmnopqrstuvwxyz".split("");
 const p = console.log;
-
-interface ANode {
-  keys: string[];
-  visited: string[];
-  name: string;
-  weight: number;
-  hWeight: number;
-  totalWeight: number;
-}
-
-class PriorityQueue {
-  private items: ANode[];
-  constructor() {
-    this.items = [];
-  }
-  isEmpty(): boolean {
-    return this.items.length <= 0;
-  }
-  // we need to do two things, once add comes, reshuffle to manage prio
-  // prio by the total weight
-  // if the element is present then compare the weights and if new node has less weight then replace with new node
-  push(node: ANode): void {
-    // if the node exists, should we remove it?
-    const existing = this.items.find((n) => n.name === node.name);
-    if (existing) {
-      if (existing.keys.length < node.keys.length) {
-        this.items.splice(this.items.indexOf(existing), 1, node);
-      } else if (existing.totalWeight > node.totalWeight) {
-        this.items.splice(this.items.indexOf(existing), 1, node);
-      }
-    } else {
-      this.items.push(node);
-    }
-    // rearrange
-    // p(`items: ${JSON.stringify(this.items)}`)
-    this.items.sort((a, b) => a.totalWeight - b.totalWeight);
-    // this.items.filter(e => e.keys.length === 17).forEach(e => p(e))
-  }
-  front(): ANode | undefined {
-    return this.items.shift();
-  }
-}
 
 interface Point {
   loc: number[];
@@ -49,19 +9,22 @@ interface Point {
   key: string;
   doors: string[];
 }
+
+interface Edge {
+  from: string;
+  to: string;
+  weight: number;
+  doors: string[];
+}
+
 const matchCoords = (a: number[], b: number[]) =>
   a[0] === b[0] && a[1] === b[1];
+
 const getAtLoc = (graph: string[][]) =>
   (loc: number[]) => graph[loc[0]][loc[1]];
 
-const part1 = async (raw: string) => {
-  const lines = raw.split("\n");
-  const graph: string[][] = [];
-  for (const line of lines) {
-    graph.push(line.split(""));
-  }
-  // find key locations @, a-z
-  const findKeyLoc = (key: string): [string, number[]] => {
+const findKeyLoc = (graph: string[][]) =>
+  (key: string): [string, number[]] => {
     const loc = [];
     for (let r = 0; r < graph.length; r++) {
       const idx = graph[r].findIndex((x) => x === key);
@@ -73,24 +36,109 @@ const part1 = async (raw: string) => {
     }
     return [key, loc];
   };
-  // find possible movements
-  const poss = (pt: Point) => {
-    const { loc } = pt;
-    return [
-      [loc[0], loc[1] + 1],
-      [loc[0], loc[1] - 1],
-      [loc[0] + 1, loc[1]],
-      [loc[0] - 1, loc[1]],
-    ];
+
+const poss = (pt: Point) => {
+  const { loc } = pt;
+  return [
+    [loc[0], loc[1] + 1],
+    [loc[0], loc[1] - 1],
+    [loc[0] + 1, loc[1]],
+    [loc[0] - 1, loc[1]],
+  ];
+};
+
+const filterBoundries = (graph: string[][]) =>
+  (p: number[]) => graph[p[0]][p[1]] !== "#";
+
+const filterVisited = (visited: number[][]) =>
+  (p: number[]) => !visited.some((v) => matchCoords(v, p));
+
+const keysToNumber = (keys: string[]): number => {
+  return parseInt(nodes.map((e) => keys.includes(e) ? "1" : "0").join(""), 2);
+};
+const numberToKey = (num: number) => {
+  return num.toString(2).padStart(nodes.length).split("")
+    .map((e, i) => {
+      if (e === "1") return nodes[i];
+      else return undefined;
+    }).filter((e) => e !== undefined);
+};
+const getWeightFromEdges = (edges: Edge[]) =>
+  (from: string, to: string) => {
+    const edge = edges.find((e) => e.from === from && e.to === to);
+    if (edge) {
+      return edge.weight;
+    }
+    p(`edge not found for ${from}: ${to}`);
+    return -1;
   };
-  const filterBoundries = (p: number[]) => graph[p[0]][p[1]] !== "#";
-  const filterVisited = (visited: number[][]) =>
-    (p: number[]) => !visited.some((v) => matchCoords(v, p));
-  // prepare queue with each key loaction
-  // const queue: Point[] = "@abcdefghijklmnopqurstuvwxyz".split("")
-  const nodes = "@abcdefghijklmnop".split("");
+const canIGo = (edges: Edge[]) =>
+  (from: string, to: string, rem: string[]) => {
+    const edge = edges.find((e) => e.from === from && e.to === to);
+    if (edge) {
+      return edge.doors.every((d) => !rem.includes(d));
+    }
+
+    p(`edge not found for ${from}: ${to}`);
+    return false;
+  };
+
+// we are going to find shortest path with memo table
+const memo: [string, number, number][] = [];
+let counterWithout = 0;
+let counterWithMemo = 0;
+const shortestPath = async (
+  from: string,
+  to: string[],
+  edges: Edge[],
+): Promise<number> => {
+  if (counterWithout % 5000 === 0) p({ counterWithout, counterWithMemo });
+  // await delay(1000);
+  // corner case
+  if (to.length === 0) return -1;
+  counterWithout++;
+  // check if we have cached val if so return
+  const cachedVal = memo.find((e) =>
+    e[0] === from && e[1] === keysToNumber(to)
+  );
+  if (cachedVal) return cachedVal[2];
+  counterWithMemo++;
+  // p({ from, to });
+  const getE = getWeightFromEdges(edges);
+  const blocked = canIGo(edges);
+  // we have not reached to the point where we can take the vals from edges
+  const paths: number[] = [];
+  for (let i = 0; i < to.length; i++) {
+    const newFrom = to[i];
+    const newTo = to.slice();
+    newTo.splice(i, 1);
+    // p({ from, newFrom, newTo });
+    if (!blocked(from, newFrom, newTo)) continue;
+
+    // p({ newFrom, newTo });
+    let path = getE(from, newFrom);
+    if (newTo.length > 0) {
+      path += await shortestPath(newFrom, newTo, edges);
+    }
+    // p({ from, newFrom, newTo, path });
+    paths.push(path);
+  }
+  const min = Math.min(...paths);
+  memo.push([from, keysToNumber(to), min]);
+  return min;
+};
+
+const part1 = async (raw: string) => {
+  const lines = raw.split("\n");
+  const graph: string[][] = [];
+  for (const line of lines) {
+    graph.push(line.split(""));
+  }
+  // BFS to find all point to all point edges
+  const findKey = findKeyLoc(graph);
+  const bounds = filterBoundries(graph);
   const queue: Point[] = nodes
-    .map((k) => findKeyLoc(k))
+    .map((k) => findKey(k))
     .map((loc) => {
       return {
         loc: loc[1],
@@ -100,30 +148,27 @@ const part1 = async (raw: string) => {
       } as Point;
     });
 
-  // now we want to build the graph of all key to key edges and the list of doors so we can yse
-  // the door thingie later
-  const edges: [string, string, number, string[]][] = [];
+  const edges: Edge[] = [];
   const g = getAtLoc(graph);
   while (queue.length > 0) {
     const curr = queue.shift();
-    // p({curr})
     if (!curr) break;
-    // is curr a key, add on edge and terminate
     if (g(curr.loc).search(/[a-z@]/) > -1 && curr.key !== g(curr.loc)) {
-      if (!edges.some((e) => e[0] === curr.key && e[1] === g(curr.loc))) {
-        // the edge is not found for the key - key combination then only add it.
-        // Due to nature of BFS we will always find the shortest path for edge first
-        // hence no need to check whether the current edge is smaller or not.
-        edges.push([curr.key, g(curr.loc), curr.visited.length, curr.doors]);
+      if (!edges.some((e) => e.from === curr.key && e.to === g(curr.loc))) {
+        edges.push({
+          from: curr.key,
+          to: g(curr.loc),
+          weight: curr.visited.length,
+          doors: curr.doors,
+        });
       }
-      // we need not go further as key is found
       // continue;
     }
 
     // is curr a door, add and proceed
     const doors = curr.doors.slice();
     if (g(curr.loc).search(/[A-Z]/) > -1) {
-      doors.push(g(curr.loc));
+      doors.push(g(curr.loc).toLowerCase());
     }
     // add curr to visited
     const visited = curr.visited.slice();
@@ -131,7 +176,7 @@ const part1 = async (raw: string) => {
 
     // check all next possibilities which are not walls and not visited
     const next = poss(curr)
-      .filter(filterBoundries)
+      .filter(bounds)
       .filter(filterVisited(visited))
       .map((loc) => {
         return {
@@ -144,64 +189,13 @@ const part1 = async (raw: string) => {
     queue.push(...next);
   }
   p(edges.sort());
-  // now we have all edges so time to work on A* algorithm to find shortest path
-  // NOT WORKINGfor heuristic measure we can use missing keys * some_number
-  // Take2: need something more concrete for hWeight
-  //  What if we remove matching keys from matching doors and for remaining doors * some_big_number
-  //  and remaining_keys * some_small_number * 1 and the value always non-negative
-  const missingKeyWeights = (keys: string[], doors: string[]): number => {
-    return doors.map((d) => d.toLowerCase())
-      .filter((d) => !keys.includes(d)).length * 26000 + (17 - keys.length)
-  };
-  const pq: PriorityQueue = new PriorityQueue();
-  pq.push({
-    name: "@",
-    weight: 0,
-    keys: ["@"],
-    visited: [],
-    hWeight: 0,
-    totalWeight: 0,
-  });
-  while (!pq.isEmpty()) {
-    const curr = pq.front();
-    if (!curr) break;
-    // if curr keys have all the keys (nodes.length - 1) then we found the answer, time to exit
-    // p();
-    p(">>", JSON.stringify(curr));
-    if (curr.keys.length === nodes.length) {
-      return curr;
-    }
-
-    // add to visitedNodes
-    const visitedNodes = curr.visited.slice();
-    visitedNodes.push(curr.name);
-
-    // find in edges all edges with start name of curr.name and
-    // filter out visitedNode with end name
-    // now edge.length is weight
-    // heuristic weight
-    // now to create new ANodes (we will remove duplicate from queue by queue impl so do not worry here)
-    // name is toKey, keys are curr.keys + name, weight = curr.weight + edge.len, heuristic distance is calculated by missingKeyWeight
-    // add these all to PriorityQueue
-    edges.filter((e) =>
-      e[0] === curr.name && !visitedNodes.some((v) => v === e[1])
-      // e[0] === curr.name // lets allow visited to visit again for Take2
-    )
-      .map((e) => {
-        const keys = curr.keys.slice();
-        if (!keys.includes(e[1])) keys.push(e[1]);
-        const ee = {
-          name: e[1],
-          keys,
-          visited: visitedNodes,
-          weight: curr.weight + e[2],
-          hWeight: missingKeyWeights(curr.keys, e[3]),
-          totalWeight: missingKeyWeights(curr.keys, e[3]) + curr.weight + e[2],
-        } as ANode;
-        // p(JSON.stringify(ee));
-        return ee;
-      }).forEach((an) => pq.push(an));
-  }
+  // alright we have all the edges, time to brute force with memo table, we will need
+  // recurrsive function for this.
+  return await shortestPath("@", nodes.slice(1), edges);
 };
 
 p(await part1(raw));
+// memo.sort().forEach((e) => {
+//   const [from, to, weight] = e;
+//   p([from, numberToKey(to), weight]);
+// });
