@@ -84,24 +84,22 @@ const canIGo = (edges: Edge[]) =>
   };
 
 // we are going to find shortest path with memo table
-const memo: [string, number, number][] = [];
+const cache: Map<string, number> = new Map();
 let counterWithout = 0;
 let counterWithMemo = 0;
-const shortestPath = async (
+const shortestPath = (
   from: string,
   to: string[],
   edges: Edge[],
-): Promise<number> => {
-  if (counterWithout % 5000 === 0) p({ counterWithout, counterWithMemo });
+): number => {
   // await delay(1000);
   // corner case
   if (to.length === 0) return -1;
   counterWithout++;
   // check if we have cached val if so return
-  const cachedVal = memo.find((e) =>
-    e[0] === from && e[1] === keysToNumber(to)
-  );
-  if (cachedVal) return cachedVal[2];
+  const key = from + to.join("");
+  const cachedVal = cache.get(key);
+  if (cachedVal) return cachedVal;
   counterWithMemo++;
   // p({ from, to });
   const getE = getWeightFromEdges(edges);
@@ -118,17 +116,17 @@ const shortestPath = async (
     // p({ newFrom, newTo });
     let path = getE(from, newFrom);
     if (newTo.length > 0) {
-      path += await shortestPath(newFrom, newTo, edges);
+      path += shortestPath(newFrom, newTo, edges);
     }
     // p({ from, newFrom, newTo, path });
     paths.push(path);
   }
   const min = Math.min(...paths);
-  memo.push([from, keysToNumber(to), min]);
+  cache.set(key, min);
   return min;
 };
 
-const part1 = async (raw: string) => {
+const part1 = (raw: string) => {
   const lines = raw.split("\n");
   const graph: string[][] = [];
   for (const line of lines) {
@@ -188,14 +186,16 @@ const part1 = async (raw: string) => {
       });
     queue.push(...next);
   }
-  p(edges.sort());
+  edges.sort()
   // alright we have all the edges, time to brute force with memo table, we will need
   // recurrsive function for this.
-  return await shortestPath("@", nodes.slice(1), edges);
+  console.timeLog("p");
+  return shortestPath("@", nodes.slice(1), edges);
 };
 
-p(await part1(raw));
-// memo.sort().forEach((e) => {
-//   const [from, to, weight] = e;
-//   p([from, numberToKey(to), weight]);
-// });
+console.time("p");
+p(part1(raw));
+console.timeEnd("p");
+// p(memo.length)
+
+p({ counterWithout, counterWithMemo });
