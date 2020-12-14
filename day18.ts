@@ -84,12 +84,16 @@ const shortestPath = (
   return min;
 };
 
-const part1 = (raw: string) => {
+const buildGraph = (raw: string) => {
   const lines = raw.split("\n");
   const graph: string[][] = [];
   for (const line of lines) {
     graph.push(line.split(""));
   }
+  return graph;
+};
+
+const calcEdges = (graph: string[][]) => {
   const findKey = findKeyLoc(graph);
   const bounds = filterBoundries(graph);
   const queue: Point[] = nodes
@@ -137,8 +141,14 @@ const part1 = (raw: string) => {
       });
     queue.push(...next);
   }
-  return shortestPath("@", nodes.slice(1), edges);
+  return edges;
 };
+
+const part1 = (raw: string) => {
+  const graph = buildGraph(raw);
+  return shortestPath("@", nodes.slice(1), calcEdges(graph));
+};
+
 
 console.time("p");
 p(part1(raw));
