@@ -27,6 +27,13 @@ class PriorityQueue {
     if (!this.keys.has(this.makekey(pt))) {
       this.queue.push(pt);
       this.keys.add(this.makekey(pt));
+    } else {
+      const index = this.queue
+        .findIndex((p) => p.x === pt.x && p.y === pt.y && p.keys === pt.keys);
+      const old = this.queue[index];
+      if (old.distance > pt.distance) {
+        this.queue.splice(index, 1, pt);
+      }
     }
   }
   pop(): Point {
@@ -66,8 +73,8 @@ const findstart = (graph: string[][]) => {
 
 const findalledges = (graph: string[][]) =>
   (from: Point) => {
-    p("==============");
-    p({ from });
+    // p("==============");
+    // p({ from });
     const visited: Set<string> = new Set();
     const ans: Array<Point> = [];
     const makekey = (pt: Point) => JSON.stringify([pt.x, pt.y]);
@@ -115,7 +122,7 @@ const findalledges = (graph: string[][]) =>
   };
 
 const part1 = (raw: string) => {
-  raw.split("\n").forEach((line) => p(line));
+  // raw.split("\n").forEach((line) => p(line));
   const graph = raw.split("\n").map((line) => line.split(""));
   const allkeys = raw.split("").filter((c) => rekeys.test(c)).sort();
   // check wether entry exists with same keys, same coords
@@ -132,23 +139,18 @@ const part1 = (raw: string) => {
     distance: 0,
   });
 
-  const ans: Array<Point> = [];
-
   while (q.hasmore()) {
     const curr = q.pop();
     visited.add(makekey(curr));
     if (curr.keys === allkeynum) {
-      ans.push(curr);
-      // p(">>>>>==============");
-      // p({ curr });
-      continue;
+      p(">>>>>==============");
+      p({ curr });
+      break;
     }
     const edges = findE(curr);
     edges.filter((e) => !visited.has(makekey(e)))
       .forEach((e) => q.push(e));
-    p({ curr, edges });
+    // p({ curr, edges });
   }
-  p(">>>>>==============");
-  p({ ans });
 };
 part1(raw);
