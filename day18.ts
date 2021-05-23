@@ -1,155 +1,154 @@
 const raw = await Deno.readTextFile(Deno.args[0] ?? "18.in");
-const nodes = "@abcdefghijklmnopqrstuvwxyz".split("");
 const p = console.log;
 
+const rekeys = new RegExp("[a-z]");
+const redoors = new RegExp("[A-Z]");
+
 interface Point {
-  loc: number[];
-  visited: number[][];
-  key: string;
-  doors: string[];
+  x: number;
+  y: number;
+  keys: number;
+  distance: number;
 }
 
-interface Edge {
-  weight: number;
-  doors: string[];
+class PriorityQueue {
+  queue: Array<Point>;
+  keys: Set<string>;
+  constructor(start: Point) {
+    this.queue = [start];
+    this.keys = new Set();
+    this.keys.add(this.makekey(start));
+  }
+  makekey(pt: Point): string {
+    return JSON.stringify([pt.x, pt.y, pt.keys]);
+  }
+  push(pt: Point): void {
+    // dont add if exists
+    if (!this.keys.has(this.makekey(pt))) {
+      this.queue.push(pt);
+      this.keys.add(this.makekey(pt));
+    }
+  }
+  pop(): Point {
+    this.queue.sort((a, b) => a.distance - b.distance);
+    const pt = this.queue.shift();
+    if (pt) {
+      this.keys.delete(this.makekey(pt));
+      return pt;
+    }
+    throw new Error("Empty queue");
+  }
+  hasmore(): boolean {
+    return this.queue.length > 0;
+  }
 }
 
-const matchCoords = (a: number[], b: number[]) =>
-  a[0] === b[0] && a[1] === b[1];
+const iskeypresent = (keys: number, key: string) => {
+  return keys === (keys | Math.pow(2, key.charCodeAt(0) - 97));
+};
+const keyadd = (keys: number, key: string) => {
+  return keys | Math.pow(2, key.charCodeAt(0) - 97);
+};
 
-const getAtLoc = (graph: string[][]) =>
-  (loc: number[]) => graph[loc[0]][loc[1]];
-
-const findKeyLoc = (graph: string[][]) =>
-  (key: string): [string, number[]] => {
-    const loc = [];
-    for (let r = 0; r < graph.length; r++) {
-      const idx = graph[r].findIndex((x) => x === key);
-      if (idx > -1) {
-        loc.push(r);
-        loc.push(idx);
-        break;
+const findstart = (graph: string[][]) => {
+  let x = -1;
+  let y = -1;
+  graph.forEach((line, r) => {
+    line.forEach((cell, c) => {
+      if (cell === "@") {
+        x = r;
+        y = c;
       }
-    }
-    return [key, loc];
-  };
-
-const poss = (pt: Point) => {
-  const { loc } = pt;
-  return [
-    [loc[0], loc[1] + 1],
-    [loc[0], loc[1] - 1],
-    [loc[0] + 1, loc[1]],
-    [loc[0] - 1, loc[1]],
-  ];
-};
-
-const filterBoundries = (graph: string[][]) =>
-  (p: number[]) => graph[p[0]][p[1]] !== "#";
-
-const filterVisited = (visited: number[][]) =>
-  (p: number[]) => !visited.some((v) => matchCoords(v, p));
-
-const isBlocked = (edge: Edge, rem: string[]) => {
-  return edge.doors.every((d) => !rem.includes(d));
-};
-
-// we are going to find shortest path with memo table
-const cache: Map<string, number> = new Map();
-const shortestPath = (
-  from: string,
-  to: string[],
-  edges: Map<string, Edge>,
-): number => {
-  if (to.length === 0) return -1;
-  const key = from + to.sort().join("");
-  const cachedVal = cache.get(key);
-  if (cachedVal) return cachedVal;
-  const paths: number[] = [];
-  for (let i = 0; i < to.length; i++) {
-    const newFrom = to[i];
-    const newTo = to.slice();
-    newTo.splice(i, 1);
-    const edge = edges.get(from + ":" + newFrom);
-    if (!edge) continue;
-    if (!isBlocked(edge, newTo)) continue;
-    let path = edge.weight ?? -1;
-    if (newTo.length > 0) {
-      path += shortestPath(newFrom, newTo, edges);
-    }
-    paths.push(path);
-  }
-  const min = Math.min(...paths);
-  cache.set(key, min);
-  return min;
-};
-
-const buildGraph = (raw: string) => {
-  const lines = raw.split("\n");
-  const graph: string[][] = [];
-  for (const line of lines) {
-    graph.push(line.split(""));
-  }
-  return graph;
-};
-
-const calcEdges = (graph: string[][]) => {
-  const findKey = findKeyLoc(graph);
-  const bounds = filterBoundries(graph);
-  const queue: Point[] = nodes
-    .map((k) => findKey(k))
-    .map((loc) => {
-      return {
-        loc: loc[1],
-        visited: [],
-        key: loc[0],
-        doors: [],
-      } as Point;
     });
+  });
+  return [x, y];
+};
 
-  const edges: Map<string, Edge> = new Map();
-  const g = getAtLoc(graph);
-  while (queue.length > 0) {
-    const curr = queue.shift();
-    if (!curr) break;
-    if (g(curr.loc).search(/[a-z@]/) > -1 && curr.key !== g(curr.loc)) {
-      const key = curr.key + ":" + g(curr.loc);
-      if (!edges.has(key)) {
-        edges.set(key, {
-          weight: curr.visited.length,
-          doors: curr.doors,
-        });
-      }
-    }
-
-    const doors = curr.doors.slice();
-    if (g(curr.loc).search(/[A-Z]/) > -1) {
-      doors.push(g(curr.loc).toLowerCase());
-    }
-    const visited = curr.visited.slice();
-    visited.push(curr.loc);
-    const next = poss(curr)
-      .filter(bounds)
-      .filter(filterVisited(visited))
-      .map((loc) => {
+const findalledges = (graph: string[][]) =>
+  (from: Point) => {
+    p("==============");
+    p({ from });
+    const visited: Set<string> = new Set();
+    const ans: Array<Point> = [];
+    const makekey = (pt: Point) => JSON.stringify([pt.x, pt.y]);
+    const neighbours = (pt: Point) => {
+      return [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => {
         return {
-          loc,
-          key: curr.key,
-          visited,
-          doors,
+          x: pt.x + dx,
+          y: pt.y + dy,
+          keys: pt.keys,
+          distance: pt.distance + 1,
         } as Point;
       });
-    queue.push(...next);
-  }
-  return edges;
-};
+    };
+    const obj = (pt: Point) => graph[pt.x][pt.y];
+    const notblocked = (pt: Point) => obj(pt) !== "#";
+    const queue = [from];
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      // p({curr, queue})
+      if (curr === undefined) break;
+      if (visited.has(makekey(curr))) continue;
+      visited.add(makekey(curr));
+      const val = obj(curr);
+      // if door and has key, then go ahead, else break this link
+      if (redoors.test(val)) {
+        if (!iskeypresent(curr.keys, val.toLowerCase())) continue;
+      }
+      // if key and not present in keys then add edge else go further
+      if (rekeys.test(val)) {
+        if (!iskeypresent(curr.keys, val)) {
+          const key: Point = {
+            x: curr.x,
+            y: curr.y,
+            keys: keyadd(curr.keys, val),
+            distance: curr.distance,
+          };
+          ans.push(key);
+          continue;
+        }
+      }
+      // else get eligible (non #) neighbours and add to queue
+      queue.push(...neighbours(curr).filter((nn) => notblocked(nn)));
+    }
+    return ans;
+  };
 
 const part1 = (raw: string) => {
-  const graph = buildGraph(raw);
-  return shortestPath("@", nodes.slice(1), calcEdges(graph));
+  raw.split("\n").forEach((line) => p(line));
+  const graph = raw.split("\n").map((line) => line.split(""));
+  const allkeys = raw.split("").filter((c) => rekeys.test(c)).sort();
+  // check wether entry exists with same keys, same coords
+  const visited: Set<string> = new Set();
+  const makekey = (pt: Point) => JSON.stringify([pt.x, pt.y, pt.keys]);
+  const allkeynum = Math.pow(2, allkeys.length) - 1;
+  // p({allkeys, allkeynum, bits: allkeynum.toString(2)})
+  const findE = findalledges(graph);
+  const start = findstart(graph);
+  const q = new PriorityQueue({
+    x: start[0],
+    y: start[1],
+    keys: 0,
+    distance: 0,
+  });
+
+  const ans: Array<Point> = [];
+
+  while (q.hasmore()) {
+    const curr = q.pop();
+    visited.add(makekey(curr));
+    if (curr.keys === allkeynum) {
+      ans.push(curr);
+      // p(">>>>>==============");
+      // p({ curr });
+      continue;
+    }
+    const edges = findE(curr);
+    edges.filter((e) => !visited.has(makekey(e)))
+      .forEach((e) => q.push(e));
+    p({ curr, edges });
+  }
+  p(">>>>>==============");
+  p({ ans });
 };
-
-
-console.time("p");
-p(part1(raw));
-console.timeEnd("p");
+part1(raw);
