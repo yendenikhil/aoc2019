@@ -11,36 +11,26 @@ interface Point {
   distance: number;
 }
 
-class PriorityQueue {
-  queue: Array<Point>;
-  keys: Set<string>;
-  constructor(start: Point) {
+class PriorityQueue<T> {
+  queue: Array<T>;
+  makekey: { (t: T): string };
+  sortFn: { (a: T, b: T): number };
+  constructor(
+    start: T,
+    keyFn: { (t: T): string },
+    sorting: { (a: T, b: T): number },
+  ) {
     this.queue = [start];
-    this.keys = new Set();
-    this.keys.add(this.makekey(start));
+    this.makekey = keyFn;
+    this.sortFn = sorting;
   }
-  makekey(pt: Point): string {
-    return JSON.stringify([pt.x, pt.y, pt.keys]);
+  push(pt: T): void {
+    this.queue.push(pt);
   }
-  push(pt: Point): void {
-    // dont add if exists
-    if (!this.keys.has(this.makekey(pt))) {
-      this.queue.push(pt);
-      this.keys.add(this.makekey(pt));
-    } else {
-      const index = this.queue
-        .findIndex((p) => p.x === pt.x && p.y === pt.y && p.keys === pt.keys);
-      const old = this.queue[index];
-      if (old.distance > pt.distance) {
-        this.queue.splice(index, 1, pt);
-      }
-    }
-  }
-  pop(): Point {
-    this.queue.sort((a, b) => a.distance - b.distance);
+  pop(): T {
+    this.queue.sort(this.sortFn);
     const pt = this.queue.shift();
     if (pt) {
-      this.keys.delete(this.makekey(pt));
       return pt;
     }
     throw new Error("Empty queue");
@@ -132,18 +122,25 @@ const part1 = (raw: string) => {
   // p({allkeys, allkeynum, bits: allkeynum.toString(2)})
   const findE = findalledges(graph);
   const start = findstart(graph);
-  const q = new PriorityQueue({
-    x: start[0],
-    y: start[1],
-    keys: 0,
-    distance: 0,
-  });
+  const qKeyFn = (pt: Point) => JSON.stringify([pt.x, pt.y, pt.keys]);
+  const qSortFn = (a: Point, b: Point) => a.distance - b.distance;
+  const q = new PriorityQueue<Point>(
+    {
+      x: start[0],
+      y: start[1],
+      keys: 0,
+      distance: 0,
+    },
+    qKeyFn,
+    qSortFn,
+  );
 
   while (q.hasmore()) {
     const curr = q.pop();
+    if (visited.has(makekey(curr))) continue;
     visited.add(makekey(curr));
     if (curr.keys === allkeynum) {
-      p(">>>>>==============");
+      // p(">>>>>==============");
       p({ curr });
       break;
     }
@@ -153,4 +150,7 @@ const part1 = (raw: string) => {
     // p({ curr, edges });
   }
 };
+
+console.time("p");
 part1(raw);
+console.timeLog("p");
